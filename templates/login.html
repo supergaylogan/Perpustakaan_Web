@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Perpustakaan Kampus</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="bg-light">
+
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="{{ url_for('beranda') }}">
+                <i class="fa-solid fa-book-open-reader me-2"></i>
+                Perpustakaan Kampus
+            </a>
+            <a href="{{ url_for('beranda') }}" class="btn btn-outline-light btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> Kembali ke Katalog
+            </a>
+        </div>
+    </nav>
+
+    <!-- FORM LOGIN -->
+    <div class="container my-5">
+        <div class="row justify-content-center">
+            <div class="col-md-5">
+                <div class="card shadow-sm border-0 rounded-3">
+                    <div class="card-header bg-white py-3 text-center">
+                        <h5 class="m-0 fw-bold text-primary">
+                            <i class="fa-solid fa-right-to-bracket me-2"></i>
+                            Login Anggota Perpustakaan
+                        </h5>
+                    </div>
+
+                    <div class="card-body p-4">
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+
+                        <form method="POST" action="{{ url_for('login') }}">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Username</label>
+                                <input type="text" name="username" class="form-control" placeholder="Masukkan username">
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Password</label>
+                                <input type="password" name="password" class="form-control" placeholder="Masukkan password">
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 fw-semibold">
+                                <i class="fa-solid fa-right-to-bracket me-1"></i> Masuk (Login)
+                            </button>
+                        </form>
+
+                        <hr class="my-4">
+                        <p class="text-center mb-0">
+                            Belum punya akun mahasiswa?
+                            <a href="{{ url_for('register') }}" class="fw-bold text-decoration-none">Register di sini</a>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Info Akun Uji Coba -->
+                <div class="alert alert-secondary mt-3 small">
+                    <strong>Akun Demo Default:</strong><br>
+                    • Mahasiswa: <code>rivandi</code> | Pass: <code>123456</code><br>
+                    • Admin: <code>admin</code> | Pass: <code>admin123</code>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
