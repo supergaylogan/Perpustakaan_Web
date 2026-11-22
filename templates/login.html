@@ -14,12 +14,12 @@
     <!-- NAVBAR -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
         <div class="container">
-            <a class="navbar-brand fw-bold" href="{{ url_for('beranda') }}">
+            <span class="navbar-brand fw-bold">
                 <i class="fa-solid fa-book-open-reader me-2"></i>
                 Perpustakaan Kampus
-            </a>
-            <a href="{{ url_for('beranda') }}" class="btn btn-outline-light btn-sm">
-                <i class="fa-solid fa-arrow-left me-1"></i> Kembali ke Katalog
+            </span>
+            <a href="{{ url_for('register') }}" class="btn btn-success btn-sm fw-semibold">
+                <i class="fa-solid fa-user-plus me-1"></i> Register Akun Baru
             </a>
         </div>
     </nav>
@@ -32,8 +32,9 @@
                     <div class="card-header bg-white py-3 text-center">
                         <h5 class="m-0 fw-bold text-primary">
                             <i class="fa-solid fa-right-to-bracket me-2"></i>
-                            Login Anggota Perpustakaan
+                            Login Sistem Perpustakaan
                         </h5>
+                        <small class="text-muted">Masuk sebagai Mahasiswa atau Admin Perpustakaan</small>
                     </div>
 
                     <div class="card-body p-4">
@@ -51,7 +52,7 @@
                         <form method="POST" action="{{ url_for('login') }}">
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Username</label>
-                                <input type="text" name="username" class="form-control" placeholder="Masukkan username">
+                                <input type="text" name="username" class="form-control" placeholder="Masukkan username (admin / mahasiswa)">
                             </div>
                             <div class="mb-4">
                                 <label class="form-label fw-semibold">Password</label>
@@ -64,17 +65,20 @@
 
                         <hr class="my-4">
                         <p class="text-center mb-0">
-                            Belum punya akun mahasiswa?
-                            <a href="{{ url_for('register') }}" class="fw-bold text-decoration-none">Register di sini</a>
+                            Mahasiswa belum punya akun?
+                            <a href="{{ url_for('register') }}" class="fw-bold text-success text-decoration-none">
+                                Register dulu di sini
+                            </a>
                         </p>
                     </div>
                 </div>
 
-                <!-- Info Akun Uji Coba -->
-                <div class="alert alert-secondary mt-3 small">
-                    <strong>Akun Demo Default:</strong><br>
-                    • Mahasiswa: <code>rivandi</code> | Pass: <code>123456</code><br>
-                    • Admin: <code>admin</code> | Pass: <code>admin123</code>
+                <!-- Keterangan Akses -->
+                <div class="card border-0 bg-white shadow-sm mt-3">
+                    <div class="card-body py-2 px-3 small text-muted">
+                        <div><i class="fa-solid fa-user-graduate text-primary me-1"></i> <strong>Mahasiswa:</strong> Gunakan akun hasil Register untuk pinjam/kembali buku.</div>
+                        <div class="mt-1"><i class="fa-solid fa-user-shield text-dark me-1"></i> <strong>Admin Perpus:</strong> Username <code>admin</code> | Password <code>admin123</code></div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -46,7 +46,7 @@ def inisialisasi_database():
         )
     """)
 
-    # Pastikan kolom username, password, peran tersedia jika memakai db lama
+    # Pastikan kolom lengkap jika memakai database lama
     cursor.execute("PRAGMA table_info(mahasiswa)")
     kolom_ada = [row[1] for row in cursor.fetchall()]
     if 'username' not in kolom_ada:
@@ -55,15 +55,6 @@ def inisialisasi_database():
         cursor.execute("ALTER TABLE mahasiswa ADD COLUMN password TEXT")
     if 'peran' not in kolom_ada:
         cursor.execute("ALTER TABLE mahasiswa ADD COLUMN peran VARCHAR(20) DEFAULT 'mahasiswa'")
-
-    # Lengkapi data lama jika username masih kosong
-    cursor.execute("""
-        UPDATE mahasiswa
-        SET username = 'rivandi',
-            password = ?,
-            peran = 'mahasiswa'
-        WHERE nim = '2310101031' AND (username IS NULL OR username = '')
-    """, (generate_password_hash('123456'),))
 
     # Isi data sampel buku jika kosong
     cursor.execute('SELECT COUNT(*) FROM buku')
@@ -80,21 +71,13 @@ def inisialisasi_database():
             VALUES (?, ?, ?, ?)
         """, buku_sampel)
 
-    # Isi akun ADMIN default sesuai flowchart
+    # Isi akun ADMIN PERPUSTAKAAN default (Username: admin | Pass: admin123)
     cursor.execute("SELECT COUNT(*) FROM mahasiswa WHERE username = 'admin'")
     if cursor.fetchone()[0] == 0:
         cursor.execute("""
             INSERT INTO mahasiswa (nim, username, password, peran)
             VALUES (?, ?, ?, ?)
         """, ('ADM001', 'admin', generate_password_hash('admin123'), 'admin'))
-
-    # Isi 1 akun MAHASISWA contoh
-    cursor.execute("SELECT COUNT(*) FROM mahasiswa WHERE nim = '2310101031'")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("""
-            INSERT INTO mahasiswa (nim, username, password, peran)
-            VALUES (?, ?, ?, ?)
-        """, ('2310101031', 'rivandi', generate_password_hash('123456'), 'mahasiswa'))
 
     conn.commit()
     conn.close()
@@ -104,58 +87,62 @@ inisialisasi_database()
 
 
 # ==========================================
-# MODUL DATA ANGGOTA: REGISTER
+# 1. REGISTER (KHUSUS MAHASISWA BARU)
 # ==========================================
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if 'user_id' in session:
+        if session.get('peran') == 'admin':
+            return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('beranda'))
+
     if request.method == 'POST':
         nim = request.form.get('nim', '').strip()
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
 
-        # Validasi 1: Data tidak boleh kosong (sesuai flowchart)
         if not nim or not username or not password:
             flash("Data tidak boleh kosong!", "danger")
             return render_template('register.html')
 
         conn = get_db_connection()
 
-        # Validasi 2: Cek NIM sudah terdaftar (fungsi cari_anggota)
-        cek_nim = conn.execute("SELECT * FROM mahasiswa WHERE nim = ?", (nim,)).fetchone()
-        if cek_nim:
+        if conn.execute("SELECT * FROM mahasiswa WHERE nim = ?", (nim,)).fetchone():
             conn.close()
             flash("NIM sudah terdaftar!", "warning")
             return render_template('register.html')
 
-        # Validasi 3: Cek Username sudah dipakai
-        cek_user = conn.execute("SELECT * FROM mahasiswa WHERE username = ?", (username,)).fetchone()
-        if cek_user:
+        if conn.execute("SELECT * FROM mahasiswa WHERE username = ?", (username,)).fetchone():
             conn.close()
-            flash("Username sudah digunakan, pilih yang lain!", "warning")
+            flash("Username sudah digunakan, pilih username lain!", "warning")
             return render_template('register.html')
 
-        # Simpan anggota baru dengan peran default 'mahasiswa'
-        password_hash = generate_password_hash(password)
+        # Pendaftar baru otomatis mendapat peran 'mahasiswa'
         conn.execute("""
             INSERT INTO mahasiswa (nim, username, password, peran)
             VALUES (?, ?, ?, ?)
-        """, (nim, username, password_hash, 'mahasiswa'))
+        """, (nim, username, generate_password_hash(password), 'mahasiswa'))
         conn.commit()
         conn.close()
 
-        flash("Registrasi berhasil! Silakan login.", "success")
+        flash("Registrasi berhasil! Silakan login menggunakan akun mahasiswa Anda.", "success")
         return redirect(url_for('login'))
 
     return render_template('register.html')
 
 
 # ==========================================
-# MODUL DATA ANGGOTA: LOGIN & LOGOUT
+# 2. LOGIN & LOGOUT (PEMISAHAN ARAH ROLE)
 # ==========================================
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if 'user_id' in session:
+        if session.get('peran') == 'admin':
+            return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('beranda'))
+
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
@@ -168,19 +155,22 @@ def login():
         anggota = conn.execute("SELECT * FROM mahasiswa WHERE username = ?", (username,)).fetchone()
         conn.close()
 
-        # Validasi 1 & 2 sesuai flowchart login(username, password)
         if anggota is None or not check_password_hash(anggota['password'], password):
             flash("Login gagal! Username atau password salah.", "danger")
             return render_template('login.html')
 
-        # Simpan data sesi pengguna yang berhasil login
         session['user_id'] = anggota['id']
         session['nim'] = anggota['nim']
         session['username'] = anggota['username']
         session['peran'] = anggota['peran']
 
-        flash(f"Selamat datang, {anggota['username']}!", "success")
-        return redirect(url_for('beranda'))
+        # Arahkan ke halaman berbeda sesuai peran
+        if anggota['peran'] == 'admin':
+            flash(f"Login Admin berhasil! Selamat datang, {anggota['username']}.", "success")
+            return redirect(url_for('admin_dashboard'))
+        else:
+            flash(f"Selamat datang, {anggota['username']}! Silakan pilih buku untuk dipinjam.", "success")
+            return redirect(url_for('beranda'))
 
     return render_template('login.html')
 
@@ -188,32 +178,23 @@ def login():
 @app.route('/logout')
 def logout():
     session.clear()
-    flash("Anda telah berhasil logout.", "info")
+    flash("Anda telah keluar dari sistem.", "info")
     return redirect(url_for('login'))
 
 
 # ==========================================
-# MODUL DATA ANGGOTA: TAMPILKAN ANGGOTA
-# ==========================================
-
-@app.route('/mahasiswa')
-def daftar_mahasiswa():
-    conn = get_db_connection()
-    semua_mahasiswa = conn.execute("""
-        SELECT * FROM mahasiswa
-        ORDER BY id ASC
-    """).fetchall()
-    conn.close()
-
-    return render_template('daftar_mahasiswa.html', daftar_mahasiswa=semua_mahasiswa)
-
-
-# ==========================================
-# BERANDA + PENCARIAN BUKU
+# 3. HALAMAN MAHASISWA (PINJAM & KEMBALIKAN)
 # ==========================================
 
 @app.route('/')
 def beranda():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    # Jika yang masuk adalah admin, arahkan ke dasbor admin
+    if session.get('peran') == 'admin':
+        return redirect(url_for('admin_dashboard'))
+
     kata_kunci = request.args.get('cari', '').strip()
     conn = get_db_connection()
 
@@ -224,24 +205,91 @@ def beranda():
             ORDER BY judul ASC
         """, (f'%{kata_kunci}%', f'%{kata_kunci}%')).fetchall()
     else:
-        daftar_buku = conn.execute("""
-            SELECT * FROM buku
-            ORDER BY judul ASC
-        """).fetchall()
+        daftar_buku = conn.execute("SELECT * FROM buku ORDER BY judul ASC").fetchall()
 
     conn.close()
     return render_template('index.html', daftar_buku=daftar_buku, kata_kunci=kata_kunci)
 
 
+@app.route('/pinjam/<int:buku_id>', methods=['POST'])
+def pinjam_buku(buku_id):
+    if 'user_id' not in session or session.get('peran') != 'mahasiswa':
+        flash("Hanya mahasiswa yang dapat meminjam buku!", "warning")
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    buku = conn.execute("SELECT * FROM buku WHERE id = ?", (buku_id,)).fetchone()
+
+    if buku and buku['stok_tersedia'] > 0:
+        conn.execute("""
+            UPDATE buku
+            SET stok_tersedia = stok_tersedia - 1
+            WHERE id = ?
+        """, (buku_id,))
+        conn.commit()
+        flash(f"Buku '{buku['judul']}' berhasil dipinjam!", "success")
+
+    conn.close()
+    return redirect(url_for('beranda'))
+
+
+@app.route('/kembalikan/<int:buku_id>', methods=['POST'])
+def kembalikan_buku(buku_id):
+    if 'user_id' not in session or session.get('peran') != 'mahasiswa':
+        flash("Hanya mahasiswa yang dapat mengembalikan buku!", "warning")
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    buku = conn.execute("SELECT * FROM buku WHERE id = ?", (buku_id,)).fetchone()
+
+    if buku and buku['stok_tersedia'] < buku['stok_total']:
+        conn.execute("""
+            UPDATE buku
+            SET stok_tersedia = stok_tersedia + 1
+            WHERE id = ?
+        """, (buku_id,))
+        conn.commit()
+        flash(f"Buku '{buku['judul']}' berhasil dikembalikan!", "info")
+
+    conn.close()
+    return redirect(url_for('beranda'))
+
+
 # ==========================================
-# TAMBAH, EDIT, HAPUS BUKU (KHUSUS ADMIN)
+# 4. HALAMAN ADMIN PERPUS (KELOLA BUKU & ANGGOTA)
 # ==========================================
+
+@app.route('/admin')
+def admin_dashboard():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    # Cegah mahasiswa masuk ke halaman admin
+    if session.get('peran') != 'admin':
+        flash("Akses ditolak! Halaman ini khusus Admin Perpustakaan.", "danger")
+        return redirect(url_for('beranda'))
+
+    kata_kunci = request.args.get('cari', '').strip()
+    conn = get_db_connection()
+
+    if kata_kunci:
+        daftar_buku = conn.execute("""
+            SELECT * FROM buku
+            WHERE judul LIKE ? OR penulis LIKE ?
+            ORDER BY judul ASC
+        """, (f'%{kata_kunci}%', f'%{kata_kunci}%')).fetchall()
+    else:
+        daftar_buku = conn.execute("SELECT * FROM buku ORDER BY judul ASC").fetchall()
+
+    conn.close()
+    return render_template('admin_dashboard.html', daftar_buku=daftar_buku, kata_kunci=kata_kunci)
+
 
 @app.route('/tambah', methods=['GET', 'POST'])
 def tambah_buku():
     if session.get('peran') != 'admin':
-        flash("Hanya admin yang dapat menambah buku.", "warning")
-        return redirect(url_for('login'))
+        flash("Akses ditolak! Hanya Admin Perpustakaan yang dapat menambah buku.", "danger")
+        return redirect(url_for('beranda'))
 
     if request.method == 'POST':
         judul = request.form['judul'].strip()
@@ -256,7 +304,8 @@ def tambah_buku():
         conn.commit()
         conn.close()
 
-        return redirect(url_for('beranda'))
+        flash(f"Buku '{judul}' berhasil ditambahkan ke katalog!", "success")
+        return redirect(url_for('admin_dashboard'))
 
     return render_template('tambah_buku.html')
 
@@ -264,8 +313,8 @@ def tambah_buku():
 @app.route('/edit/<int:buku_id>', methods=['GET', 'POST'])
 def edit_buku(buku_id):
     if session.get('peran') != 'admin':
-        flash("Hanya admin yang dapat mengedit buku.", "warning")
-        return redirect(url_for('login'))
+        flash("Akses ditolak! Hanya Admin Perpustakaan yang dapat mengedit buku.", "danger")
+        return redirect(url_for('beranda'))
 
     conn = get_db_connection()
 
@@ -285,15 +334,18 @@ def edit_buku(buku_id):
                     WHERE id = ?
                 """, (judul, penulis, stok_baru, stok_tersedia_baru, buku_id))
                 conn.commit()
+                flash(f"Data buku '{judul}' berhasil diperbarui!", "success")
+            else:
+                flash("Gagal update! Stok total baru tidak boleh lebih kecil dari jumlah buku yang sedang dipinjam.", "danger")
 
         conn.close()
-        return redirect(url_for('beranda'))
+        return redirect(url_for('admin_dashboard'))
 
     buku = conn.execute("SELECT * FROM buku WHERE id = ?", (buku_id,)).fetchone()
     conn.close()
 
     if buku is None:
-        return redirect(url_for('beranda'))
+        return redirect(url_for('admin_dashboard'))
 
     return render_template('edit_buku.html', buku=buku)
 
@@ -301,67 +353,31 @@ def edit_buku(buku_id):
 @app.route('/hapus/<int:buku_id>', methods=['POST'])
 def hapus_buku(buku_id):
     if session.get('peran') != 'admin':
-        flash("Hanya admin yang dapat menghapus buku.", "warning")
-        return redirect(url_for('login'))
+        flash("Akses ditolak! Hanya Admin Perpustakaan yang dapat menghapus buku.", "danger")
+        return redirect(url_for('beranda'))
 
     conn = get_db_connection()
     buku = conn.execute("SELECT * FROM buku WHERE id = ?", (buku_id,)).fetchone()
     if buku:
         conn.execute("DELETE FROM buku WHERE id = ?", (buku_id,))
         conn.commit()
+        flash(f"Buku '{buku['judul']}' berhasil dihapus!", "info")
 
     conn.close()
-    return redirect(url_for('beranda'))
+    return redirect(url_for('admin_dashboard'))
 
 
-# ==========================================
-# PINJAM & KEMBALIKAN BUKU (WAJIB LOGIN)
-# ==========================================
-
-@app.route('/pinjam/<int:buku_id>', methods=['POST'])
-def pinjam_buku(buku_id):
-    # Wajib login sebelum meminjam buku
-    if 'user_id' not in session:
-        flash("Silakan login terlebih dahulu sebelum meminjam buku!", "warning")
-        return redirect(url_for('login'))
+@app.route('/mahasiswa')
+def daftar_mahasiswa():
+    if session.get('peran') != 'admin':
+        flash("Akses ditolak! Data anggota hanya dapat dilihat oleh Admin.", "danger")
+        return redirect(url_for('beranda'))
 
     conn = get_db_connection()
-    buku = conn.execute("SELECT * FROM buku WHERE id = ?", (buku_id,)).fetchone()
-
-    if buku and buku['stok_tersedia'] > 0:
-        conn.execute("""
-            UPDATE buku
-            SET stok_tersedia = stok_tersedia - 1
-            WHERE id = ?
-        """, (buku_id,))
-        conn.commit()
-        flash(f"Buku '{buku['judul']}' berhasil dipinjam oleh {session['username']}!", "success")
-
+    semua_mahasiswa = conn.execute("SELECT * FROM mahasiswa ORDER BY id ASC").fetchall()
     conn.close()
-    return redirect(url_for('beranda'))
 
-
-@app.route('/kembalikan/<int:buku_id>', methods=['POST'])
-def kembalikan_buku(buku_id):
-    # Wajib login sebelum mengembalikan buku
-    if 'user_id' not in session:
-        flash("Silakan login terlebih dahulu untuk mengembalikan buku!", "warning")
-        return redirect(url_for('login'))
-
-    conn = get_db_connection()
-    buku = conn.execute("SELECT * FROM buku WHERE id = ?", (buku_id,)).fetchone()
-
-    if buku and buku['stok_tersedia'] < buku['stok_total']:
-        conn.execute("""
-            UPDATE buku
-            SET stok_tersedia = stok_tersedia + 1
-            WHERE id = ?
-        """, (buku_id,))
-        conn.commit()
-        flash(f"Buku '{buku['judul']}' telah dikembalikan!", "info")
-
-    conn.close()
-    return redirect(url_for('beranda'))
+    return render_template('daftar_mahasiswa.html', daftar_mahasiswa=semua_mahasiswa)
 
 
 if __name__ == '__main__':
