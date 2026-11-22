@@ -242,6 +242,10 @@ def daftar_mahasiswa():
 
     return render_template('daftar_mahasiswa.html', daftar_mahasiswa=semua_mahasiswa)
 
+app.add_url_rule('/admin', endpoint='admin_dashboard', view_func=app.view_functions['buku.admin_dashboard'])
+app.add_url_rule('/tambah', endpoint='tambah_buku', view_func=app.view_functions['buku.tambah_buku'], methods=['GET', 'POST'])
+app.add_url_rule('/edit/<int:buku_id>', endpoint='edit_buku', view_func=app.view_functions['buku.edit_buku'], methods=['GET', 'POST'])
+app.add_url_rule('/hapus/<int:buku_id>', endpoint='hapus_buku', view_func=app.view_functions['buku.hapus_buku'], methods=['POST'])
 
 if __name__ == '__main__':
     app.run(debug=True)
