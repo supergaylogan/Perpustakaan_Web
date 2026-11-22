@@ -171,19 +171,40 @@ def beranda():
         return redirect(url_for('admin_dashboard'))
 
     kata_kunci = request.args.get('cari', '').strip()
+    kategori_filter = request.args.get('kategori', '').strip()
+
+    daftar_kategori = [
+        'Pemrograman',
+        'Algoritma & Struktur Data',
+        'Basis Data & Jaringan',
+        'Sistem Terdistribusi & IoT',
+        'Umum',
+        'Lainnya'
+    ]
+
     conn = get_db_connection()
+    query = "SELECT * FROM buku WHERE 1=1"
+    params = []
 
     if kata_kunci:
-        daftar_buku = conn.execute("""
-            SELECT * FROM buku
-            WHERE judul LIKE ? OR penulis LIKE ?
-            ORDER BY judul ASC
-        """, (f'%{kata_kunci}%', f'%{kata_kunci}%')).fetchall()
-    else:
-        daftar_buku = conn.execute("SELECT * FROM buku ORDER BY judul ASC").fetchall()
+        query += " AND (judul LIKE ? OR penulis LIKE ?)"
+        params.extend([f'%{kata_kunci}%', f'%{kata_kunci}%'])
 
+    if kategori_filter:
+        query += " AND kategori = ?"
+        params.append(kategori_filter)
+
+    query += " ORDER BY judul ASC"
+    daftar_buku = conn.execute(query, params).fetchall()
     conn.close()
-    return render_template('index.html', daftar_buku=daftar_buku, kata_kunci=kata_kunci)
+
+    return render_template(
+        'index.html',
+        daftar_buku=daftar_buku,
+        kata_kunci=kata_kunci,
+        kategori_filter=kategori_filter,
+        daftar_kategori=daftar_kategori
+    )
 
 
 @app.route('/pinjam/<int:buku_id>', methods=['POST'])
@@ -229,18 +250,6 @@ def kembalikan_buku(buku_id):
     conn.close()
     return redirect(url_for('beranda'))
 
-
-@app.route('/mahasiswa')
-def daftar_mahasiswa():
-    if session.get('peran') != 'admin':
-        flash("Akses ditolak! Data anggota hanya dapat dilihat oleh Admin.", "danger")
-        return redirect(url_for('beranda'))
-
-    conn = get_db_connection()
-    semua_mahasiswa = conn.execute("SELECT * FROM mahasiswa ORDER BY id ASC").fetchall()
-    conn.close()
-
-    return render_template('daftar_mahasiswa.html', daftar_mahasiswa=semua_mahasiswa)
 
 app.add_url_rule('/admin', endpoint='admin_dashboard', view_func=app.view_functions['buku.admin_dashboard'])
 app.add_url_rule('/tambah', endpoint='tambah_buku', view_func=app.view_functions['buku.tambah_buku'], methods=['GET', 'POST'])
