@@ -250,11 +250,21 @@ def kembalikan_buku(buku_id):
     conn.close()
     return redirect(url_for('beranda'))
 
+@app.route('/mahasiswa')
+def daftar_mahasiswa():
+    if 'user_id' not in session or session.get('peran') != 'admin':
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    semua_mahasiswa = conn.execute("SELECT * FROM mahasiswa ORDER BY id ASC").fetchall()
+    conn.close()
+    return render_template('daftar_mahasiswa.html', daftar_mahasiswa=semua_mahasiswa)
+
+
 app.add_url_rule('/admin', endpoint='admin_dashboard', view_func=app.view_functions['buku.admin_dashboard'])
 app.add_url_rule('/tambah', endpoint='tambah_buku', view_func=app.view_functions['buku.tambah_buku'], methods=['GET', 'POST'])
 app.add_url_rule('/edit/<int:buku_id>', endpoint='edit_buku', view_func=app.view_functions['buku.edit_buku'], methods=['GET', 'POST'])
 app.add_url_rule('/hapus/<int:buku_id>', endpoint='hapus_buku', view_func=app.view_functions['buku.hapus_buku'], methods=['POST'])
-app.add_url_rule('/mahasiswa', endpoint='daftar_mahasiswa', view_func=app.view_functions['buku.daftar_mahasiswa'])
 
 if __name__ == '__main__':
     app.run(debug=True)
